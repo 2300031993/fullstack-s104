@@ -2,21 +2,22 @@ pipeline {
     agent any
 
     tools {
+        // use JDK 21 that you configured in Jenkins global tool config
         jdk 'JDK_HOME'
         maven 'MAVEN_HOME'
     }
 
     environment {
-        TOMCAT_URL = 'http://51.21.158.152:9090/manager/text'
+        TOMCAT_URL  = 'http://13.126.107.127:9090/manager/text'
         TOMCAT_USER = 'admin'
         TOMCAT_PASS = 'admin'
 
-        MAIN_REPO = 'https://github.com/satyavathiborra/fullstack-s201.git'
+        MAIN_REPO   = 'https://github.com/2300031993/fullstack-s104.git'
 
-        BACKEND_DIR = 'crud_back'
+        BACKEND_DIR  = 'crud_back'
         FRONTEND_DIR = 'crud_front'
 
-        BACKEND_WAR = 'crud_back/target/springapp1.war'
+        BACKEND_WAR  = 'crud_back/target/springapp1.war'
         FRONTEND_WAR = 'crud_front/frontapp1.war'
     }
 
@@ -34,8 +35,11 @@ pipeline {
                     env.PATH = "${nodeHome}/bin:${env.PATH}"
                 }
                 dir("${env.FRONTEND_DIR}") {
+                    // clean install for consistency
+                    sh 'rm -rf node_modules dist package-lock.json'
                     sh 'npm install'
-                    sh 'npm run build'
+                    // build using npx
+                    sh 'npx vite build'
                 }
             }
         }
@@ -55,21 +59,30 @@ pipeline {
         stage('Build Spring Boot App') {
             steps {
                 dir("${env.BACKEND_DIR}") {
-                    sh 'mvn clean package'
-                    sh 'mv target/*.war target/springapp1.war'
+                    // force Java 21 for maven
+                    sh 'mvn -Djava.version=21 clean package'
+                    sh 'mv target/*.war target/springapp1.war || true'
                 }
             }
         }
 
         stage('Deploy Spring Boot WAR') {
             steps {
-                sh "curl -u ${env.TOMCAT_USER}:${env.TOMCAT_PASS} --upload-file \"${env.BACKEND_WAR}\" \"${env.TOMCAT_URL}/deploy?path=/springapp1&update=true\""
+                sh """
+                    curl -u ${env.TOMCAT_USER}:${env.TOMCAT_PASS} \
+                        --upload-file "${env.BACKEND_WAR}" \
+                        "${env.TOMCAT_URL}/deploy?path=/springapp1&update=true"
+                """
             }
         }
 
         stage('Deploy Frontend WAR') {
             steps {
-                sh "curl -u ${env.TOMCAT_USER}:${env.TOMCAT_PASS} --upload-file \"${env.FRONTEND_WAR}\" \"${env.TOMCAT_URL}/deploy?path=/frontapp1&update=true\""
+                sh """
+                    curl -u ${env.TOMCAT_USER}:${env.TOMCAT_PASS} \
+                        --upload-file "${env.FRONTEND_WAR}" \
+                        "${env.TOMCAT_URL}/deploy?path=/frontapp1&update=true"
+                """
             }
         }
     }
